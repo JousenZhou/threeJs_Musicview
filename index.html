@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>JousenZhou_ThreeJs_MMD</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+    </style>
+    <script src="lib/three.js"></script>
+    <script src="lib/mmdparser.min.js"></script>
+    <script src="lib/ammo.js"></script>
+    <script src="lib/TGALoader.js"></script>
+    <script src="lib/MMDLoader.js"></script>
+    <script src="lib/OutlineEffect.js"></script>
+    <script src="lib/CCDIKSolver.js"></script>
+    <script src="lib/MMDPhysics.js"></script>
+    <script src="lib/MMDAnimationHelper.js"></script>
+    <script src="lib/OrbitControls.js"></script>
+    <script src="lib/Detector.js"></script>
+    <script src="lib/stats.js"></script>
+    <script src="lib/dat.gui.js"></script>
+    <script src="lib/RectAreaLightUniformsLib.js"></script>
+    <script src="lib/jquery-3.3.1.min.js"></script>
+    <script src="js/Gpu_Particle_Transform.js"></script>
+    <script src="lib/tween.min.js"></script>
+    <script src="js/init.js"></script>
+</head>
+
+<!--OpenGL-->
+<script id="vertexshader" type="x-shader/x-vertex">
+            attribute float size;
+			attribute vec3 position2;
+			                                //attribute vec3 color;；；；；；
+			 uniform float val;
+			 uniform float pixelRatio;
+			                                //varying vec3 vColor;//向片段着色器传递
+			                                  varying vec3 vPos;
+			   varying float gas;
+			   varying float t;
+               varying float z;
+               float a,b=0.;
+			void main()
+			{
+			  t=0.;
+			  z=0.;
+			  a=length(position);
+			  if(t>0.)b=max(0.,(cos(a/20.-t*.02)-.99)*3./a);
+              if(z>0.)b=max(0.,cos(a/40.-z*.01+2.));
+              gas=max(.0,sin(-a/5.));
+				//vec3 vPos;
+			   // vColor = color;//
+				vPos.x = position.x * val + position2.x * (1.-val);
+				vPos.y = position.y* val + position2.y * (1.-val);
+				vPos.z = position.z* val + position2.z * (1.-val);
+				vec4 mvPosition = modelViewMatrix * vec4( vPos, 1.0 );
+				gl_PointSize = pixelRatio*(size)*(0.3+gas*2.)/length(mvPosition.xyz)+5.;;
+				gl_Position = projectionMatrix * mvPosition;
+
+			}
+
+
+</script>
+<script id="fragmentshader" type="x-shader/x-fragment">
+            uniform vec3 color;
+            uniform float ccs;
+			//uniform sampler2D texture;
+			varying vec3 vPos;//
+			varying float gas;
+			 varying float z;
+			void main()
+			 {
+				//vec3 vColor = vec3(1.0, 1., 1.);
+                float a=distance(vPos,vPos);
+                if(a>0.)a=1.;
+                float b=max(.32,.0065*length(vPos));
+                float c=distance(gl_PointCoord,vec2(.5));
+                float starlook=-(c-.5)*1.2*gas;
+                float gaslook=(1.-gas)/(c*10.);
+                float texture=starlook+gaslook;
+
+				//vec3 vColor = vec3(1.0, 0., 0.);
+                //vColor.r = 0.5*ccs;
+                //vColor.g = 0.5;
+                //vColor.b = 0.5;
+             //   vColor.r = vPos.z/0.5;
+             //   vColor.g = vPos.y/0.5;
+             //   vColor.b = vPos.x/0.5;
+                gl_FragColor=vec4(.35,.28,b,1.)*texture*(1.-a*.35);
+                if(z>0.)gl_FragColor*=cos(1.57*z/322.)*(1.-.001*length(vPos));
+				//gl_FragColor = vec4( color * vColor, 1.5 );
+				//顶点贴图
+    			//gl_FragColor = gl_FragColor * texture2D( texture, gl_PointCoord );
+			}
+
+
+</script>
+
+<body>
+
+<div class="MusicList">
+    <ul>
+
+    </ul>
+    <p>←</p>
+</div>
+
+<div class="control" style="position: fixed;">
+    <span>AutoCamera</span><input type="checkbox" class="IsAutoCamera">
+    <input type="button" value="Start" class="start">
+    <input type="button" value="pause" class="pause">
+    <input type="button" value="load" class="load">
+    <input class="range" type="range" min="0" max="100" value="0" step="0.01"/>
+    <label>Volume:</label>
+    <input class="range2" type="range" min="0" max="1" value="1" step="0.1"/>
+</div>
+
+<div id="Stats-output" style="color: #000000"></div>
+<div id="WebGL-output"></div>
+</body>
+<style>
+    .control {
+        bottom: 10px;
+        border-radius: 15%;
+        width: 400px;
+        border: 1px solid white;
+        height: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .control > .range {
+        top: 10px;
+        position: absolute;
+        left: 30px;
+
+        width: 240px;
+    }
+
+    .control > .range2 {
+        position: absolute;
+        top: 30px;
+        left: 330px;
+        width: 60px;
+    }
+
+    .control > input[type='button'] {
+        position: absolute;
+        top: 36px;
+        background: rgba(0, 0, 0, 0);
+        color: white;
+        border: 0;
+    }
+
+    .control > .start {
+        left: 0px;
+    }
+
+    .control > .pause {
+        left: 50px;
+    }
+
+    .control > .load {
+        left: 110px;
+    }
+
+    .control > label {
+        color: white;
+        position: absolute;
+        top: 30px;
+        left: 280px;
+        font-size: 8px;
+    }
+
+    .control > span {
+        display: inline-block;
+        color: white;
+        font-size: 8px;
+        position: absolute;
+        top: 10px;
+        left: 280px;
+    }
+
+    .control > input[type='checkbox'] {
+        position: absolute;
+        top: 10px;
+        left: 358px;
+    }
+
+    .MusicList {
+        width: 200px;
+        height: 600px;
+        border: 1px solid black;
+        position: fixed;
+        top: 100px;
+        left: 0px;
+        box-shadow: 0 0 10px white inset;
+        border-radius: 2%;
+        overflow: hidden;
+    }
+
+    .MusicList > ul {
+        width: 174px;
+        height: 530px;
+        border: 1px solid white;
+        margin-left: 12px;
+        margin-top: 19px;
+        padding: 0px;
+        box-shadow: 0 0 5px white;
+        overflow: auto;
+    }
+
+    .MusicList > ul::-webkit-scrollbar { /*不兼容 火狐 和 IE*/
+        display: none;
+    }
+
+    .MusicList > ul > li {
+        margin-left: 19%;
+        width: 80%;
+        height: 40px;
+        border-bottom: 1px solid #4e4e4e;
+        color: white;
+        line-height: 40px;
+        font-size: 12px;
+        text-indent: 16px;
+        list-style: none;
+        cursor: pointer;
+        transition: all 1s;
+    }
+
+    .MusicList > ul > li:hover {
+        background: #99896E !important;
+    }
+
+    .MusicList > p {
+        color: white;
+        text-align: center;
+        font-size: 12px;
+        cursor: pointer;
+    }
+
+</style>
+</html>
